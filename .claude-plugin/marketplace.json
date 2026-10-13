@@ -1,0 +1,14 @@
+{
+  "name": "faraz-agents",
+  "owner": {
+    "name": "Faraz Fookeer"
+  },
+  "plugins": [
+    {
+      "name": "rumi-team",
+      "source": "./plugins/rumi-team",
+      "description": "Rumi and the agent team, with a live Agent Team Board."
+    }
+  ],
+  "description": "Rumi's agent team: a product manager, business analyst, developers and QA that build any project, with a live board."
+}
