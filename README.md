@@ -13,6 +13,10 @@ You describe what you want in plain words. The team plans it, checks the plan wi
 
 The team is named after philosophers and scientists of the Islamic golden age.
 
+![The Agent Team Board: the brief and definition of done, waiting for sign-off](docs/images/overview.png)
+
+<sub>Screenshots show the board with example data.</sub>
+
 ---
 
 ## What you need
@@ -67,15 +71,35 @@ You don't need to know how to code.
 
 ### Your board shows
 
-- **Brief and definition of done:** your request, Rumi's understanding of it, the checklist you signed off, and the business analyst's findings.
-- **Needs you:** questions and approvals waiting for you.
-- **Requirements:** a board of cards moving from Backlog → In development → In test → Done.
-- **Handoffs:** a live diagram of who is working on what, and who passed work to whom.
-- **Decisions and activity:** every decision Rumi made, and why.
-- **Project files:** your project's folders, with the files the team changed highlighted.
-- **Tool calls:** every action each agent took, for checking afterwards. Passwords and keys are hidden.
-- **Token burn:** how much Claude usage each agent and each model used.
-- **Data and external access:** websites, databases and files the agents touched. Anything risky is flagged in red.
+**Brief and definition of done.** Your request, Rumi's understanding of it, how it will be built, the checklist you sign off, and the business analyst's findings. *(Shown at the top of this page.)*
+
+**Needs you.** Questions and approvals waiting for you. Answer with one click.
+
+![Needs you: a question from Rumi with suggested answers](docs/images/needs.png)
+
+**Requirements.** Cards moving from Backlog → In development → In test → Done, with who's working on each one and how many checks have passed.
+
+![The requirements board](docs/images/board.png)
+
+**Handoffs.** A live diagram of who's working on what, the model each agent uses, and who passed work to whom.
+
+![The handoff diagram](docs/images/flow.png)
+
+**Decisions and project files.** Every decision Rumi made, with the reason, next to your project's folders. Files the team changed are tagged with the agent who changed them.
+
+![Decisions and activity, and the project files](docs/images/lower.png)
+
+**Tool calls.** Every action each agent took, searchable, for checking afterwards. Passwords and keys are hidden.
+
+![The tool call audit log](docs/images/audit.png)
+
+**Token burn.** How much Claude usage each agent and each model used.
+
+![Token use per agent and per model](docs/images/burn.png)
+
+**Data, external access and guardrails.** Websites, databases and files the agents touched, and everything the guardrails blocked or asked you about. Anything risky is flagged in red.
+
+![Data, external access and guardrails](docs/images/access.png)
 
 ### Just want a project set up?
 
