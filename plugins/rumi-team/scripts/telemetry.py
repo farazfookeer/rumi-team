@@ -50,6 +50,31 @@ CODE_CONFIG = ("package.json", "package-lock.json", "tsconfig.json", "composer.j
                "docker-compose.yml", "docker-compose.yaml")
 
 
+HEREDOC = re.compile(r"<<-?\s*(['\"]?)(\w+)\1[^\n]*\n.*?\n\s*\2\s*(?=\n|$)", re.S)
+
+
+def strip_heredocs(cmd):
+    """Drop heredoc bodies (file contents being written), keeping the command line itself."""
+    return HEREDOC.sub(lambda m: m.group(0).split("\n", 1)[0], cmd)
+
+
+SECRET_PATH = re.compile(r"(^|[\s'\"/=<])\.env(\.(?!example\b|sample\b|template\b|dist\b)[\w.-]+)?(?=$|[\s'\";|&)])")
+READERS = {"cat", "less", "more", "head", "tail", "source", ".", "grep", "egrep", "rg", "sed", "awk", "cp", "mv", "scp",
+           "base64", "xxd", "od", "strings", "vi", "vim", "nano", "code", "open", "export", "env", "dotenv", "python", "python3", "node"}
+
+
+def reads_secret_file(cmd):
+    """True when one step of the command line reads or copies a .env file (not just mentions it)."""
+    for seg in re.split(r"&&|\|\||[;|\n]", strip_heredocs(cmd)):
+        words = seg.strip().split()
+        if not words:
+            continue
+        first = os.path.basename(words[0])
+        if (first in READERS or re.search(r"<\s*\S*\.env", seg)) and SECRET_PATH.search(seg):
+            return True
+    return False
+
+
 def host_of(url):
     try:
         return (urlparse(url).hostname or "").lower()
@@ -76,7 +101,9 @@ def classify(name, inp):
             write = bool(re.search(r"(create|update|delete|send|write|set|post|trash|move|upload|reply|forward)", tool, re.I))
             yield ("connector", f"{server}:{tool}"[:80], write)
     elif name == "Bash":
-        cmd = str(inp.get("command", ""))
+        cmd = strip_heredocs(str(inp.get("command", "")))
+        if "run_state.py" in cmd or "telemetry.py" in cmd or "tree.py" in cmd:
+            return  # the plugin's own bookkeeping, not agent work
         for u in URL.findall(cmd):
             h = host_of(u)
             if h and h not in LOCAL_HOSTS:
@@ -86,8 +113,9 @@ def classify(name, inp):
             target = next((a for a in rest if not a.startswith("-")), "")
             yield ("database", (m.group(1) + (" " + target if target else ""))[:80], bool(SQL_WRITE.search(cmd)))
         for m in PKG.finditer(cmd):
-            yield ("package", " ".join(m.group(1).split())[:80], True)
-        if re.search(r"(^|[\s/])\.env(\.[\w.-]+)?\b", cmd) and re.search(r"\b(cat|less|head|tail|source|grep|sed)\b", cmd):
+            target = re.split(r"\s+\d?>|\s+\|", m.group(1))[0]  # drop trailing redirections and pipes
+            yield ("package", " ".join(target.split())[:80], True)
+        if reads_secret_file(cmd):
             yield ("secrets", ".env (via shell)", False)
     elif name in ("Read", "Edit", "Write", "NotebookEdit", "MultiEdit"):
         path = str(inp.get("file_path") or inp.get("notebook_path") or "")
@@ -143,7 +171,7 @@ def describe(name, inp):
 def scan(path, main=False):
     """Return (tokens, {model: tokens}, {(kind, target, write): [count, first, last]}, [tool calls])."""
     t, models, last, seen_tools, access = dict.fromkeys(KEYS, 0), {}, {}, set(), {}
-    calls, by_id = [], {}
+    calls, by_id, out_chars = [], {}, {}
     try:
         lines = open(path, encoding="utf-8")
     except OSError:
@@ -164,7 +192,11 @@ def scan(path, main=False):
             continue
         msg = d.get("message") or {}
         ts = d.get("timestamp", "")
+        okey = msg.get("id") or d.get("requestId") or d.get("uuid")
         for block in msg.get("content") or []:
+            if isinstance(block, dict):
+                body = block.get("text") or block.get("thinking") or (json.dumps(block.get("input")) if block.get("type") == "tool_use" else "")
+                out_chars[okey] = out_chars.get(okey, 0) + len(body or "")
             if not isinstance(block, dict) or block.get("type") != "tool_use" or block.get("id") in seen_tools:
                 continue
             seen_tools.add(block.get("id"))
@@ -193,6 +225,10 @@ def scan(path, main=False):
             "cacheRead": u.get("cache_read_input_tokens", 0) or 0,
             "cacheWrite": u.get("cache_creation_input_tokens", 0) or 0,
         })
+    # Subagent transcripts log each response before it finishes, so their output_tokens can be far too low.
+    # Use the larger of the logged count and an estimate from the logged content (about 4 characters a token).
+    for key, (model, row) in last.items():
+        row["out"] = max(row["out"], out_chars.get(key, 0) // 4)
     for model, row in last.values():
         m = models.setdefault(model, dict.fromkeys(KEYS, 0))
         for k in KEYS:

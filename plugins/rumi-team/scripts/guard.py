@@ -20,7 +20,7 @@ from datetime import datetime, timezone
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from run_state import find_state  # noqa: E402
-from telemetry import DB_CLIENT, LOCAL_HOSTS, PKG, SQL_WRITE, URL, host_of, redact  # noqa: E402
+from telemetry import DB_CLIENT, LOCAL_HOSTS, PKG, SQL_WRITE, URL, host_of, reads_secret_file, redact, strip_heredocs  # noqa: E402
 
 EDIT_TOOLS = {"Edit", "Write", "MultiEdit", "NotebookEdit"}
 FILE_TOOLS = EDIT_TOOLS | {"Read"}
@@ -76,9 +76,8 @@ def check(tool, ti, state):
         return None
 
     if tool == "Bash":
-        cmd = str(ti.get("command", ""))
-        if re.search(r"(^|[\s'\"/<=])\.env(\.(?!example|sample|template|dist)[\w.-]+)?(?=$|[\s'\";|&)])", cmd) and \
-                re.search(r"\b(cat|less|more|head|tail|source|grep|sed|awk|cp|mv|scp|base64|xxd|strings|vi|vim|nano)\b|(^|\s)\.\s|<\s*\S*\.env", cmd):
+        cmd = strip_heredocs(str(ti.get("command", "")))  # file contents being written aren't commands
+        if reads_secret_file(cmd):
             return "deny", "Guardrail: that command would read or copy a secrets file (.env). Agents never touch secrets."
         if FORCE_PUSH.search(cmd):
             return "deny", "Guardrail: force-pushing can destroy other people's work and is never allowed during a run."

@@ -73,6 +73,12 @@ header.top h1 { font-size: 22px; font-weight: 700; letter-spacing: -.01em; }
 .bar { height: 4px; background: var(--sunk); border-radius: 2px; overflow: hidden; flex: 1; min-width: 40px; }
 .bar i { display: block; height: 100%; background: var(--ok); }
 .rework { color: var(--warn); font-weight: 500; }
+.live-line { display: flex; align-items: center; gap: 7px; font-size: 12.5px; color: var(--accent); min-width: 0; }
+.live-line span:nth-child(2) { overflow-wrap: anywhere; }
+.live-line .since { color: var(--muted); margin-left: auto; white-space: nowrap; font-size: 11.5px; }
+.pulse-dot { flex: none; width: 7px; height: 7px; border-radius: 50%; background: var(--ok); animation: beat 2s infinite; }
+@media (prefers-reduced-motion: reduce) { .pulse-dot { animation: none; } }
+.kind.progress { background: transparent; color: var(--accent); border: 1px solid var(--accent-soft); }
 
 /* Flow + log */
 .lower { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 22px; align-items: stretch; }
@@ -369,7 +375,11 @@ function fold() {
       const c = cards[e.cardId] || (cards[e.cardId] = { id: e.cardId, title: e.cardId, column: "backlog", attempts: 0 });
       Object.assign(c, e.card); c.updatedAt = e.ts;
     }
-    if (e.agents) for (const [aid, p] of Object.entries(e.agents)) agents[aid] = Object.assign(agents[aid] || { id: aid, status: "idle" }, p);
+    if (e.agents) for (const [aid, p] of Object.entries(e.agents)) {
+      const a = (agents[aid] = Object.assign(agents[aid] || { id: aid, status: "idle" }, p));
+      a.updatedAt = e.ts;
+      if (p.status && p.status !== "working") a.activity = null;  // finished: clear the live activity line
+    }
     for (const aid of [e.from, e.to]) if (aid && !agents[aid]) agents[aid] = { id: aid, status: "idle" };
   }
   for (const a of Object.values(agents)) { a.role = roleOf(a.id, a); a.name = a.name || ROLE_LABEL[a.role] || a.id; }
@@ -391,8 +401,11 @@ async function boot() {
     renderProjectPicker();
     const keep = S.pid && S.projects.some((p) => p.id === S.pid);
     if (!keep) {
-      const saved = store("atb.project");
-      select(S.projects.some((p) => p.id === saved) ? saved : S.projects[0]?.id || null);
+      // Open the most recently active project, unless the viewer chose another one after that activity.
+      let saved = null; try { saved = JSON.parse(store("atb.pick") || "null"); } catch (e) {}
+      const newest = S.projects[0];
+      const keepSaved = saved && S.projects.some((p) => p.id === saved.id) && (!newest || saved.at >= String(newest.updatedAt || newest.createdAt || ""));
+      select(keepSaved ? saved.id : newest?.id || null);
     } else render();
   }, () => setLive(false, "Disconnected"));
 }
@@ -403,11 +416,10 @@ function renderProjectPicker() {
   sel.disabled = false;
   sel.innerHTML = S.projects.map((p) => `<option value="${esc(p.id)}"${p.id === S.pid ? " selected" : ""}>${esc(p.name || p.id)}</option>`).join("");
 }
-$("#project").addEventListener("change", (e) => select(e.target.value));
+$("#project").addEventListener("change", (e) => { store("atb.pick", JSON.stringify({ id: e.target.value, at: new Date().toISOString() })); select(e.target.value); });
 
 function select(pid) {
   S.unsub.forEach((u) => u()); S.unsub = []; S.specs = {}; S.events = []; S.attention = []; S.briefs = []; S.toolcalls = []; S.tree = null; S.treeOpen = null; S.audit.member = "all"; S.audit.limit = 100; S.pid = pid; S.open = null;
-  if (pid) store("atb.project", pid);
   renderProjectPicker();
   if (!pid) return render();
   const p = S.db.doc("projects/" + pid);
@@ -848,6 +860,7 @@ function cardHTML(c) {
   return `<button type="button" class="card${ownerWorking ? " working" : ""}" data-card="${esc(c.id)}">
     <div class="row"><span class="mono prio">${esc(c.id)}</span>${S.burn.byCard[c.id] ? `<span class="tok" title="Tokens used on this requirement">${fmtTok(S.burn.byCard[c.id])} tok</span>` : ""}${c.priority != null ? `<span class="prio">P${esc(c.priority)}</span>` : ""}</div>
     <div class="t">${esc(c.title)}</div>
+    ${ownerWorking ? `<div class="live-line"><span class="pulse-dot" aria-hidden="true"></span><span>${esc(m.agents[c.owner].activity || "Working on it")}</span><span class="since">${esc(ago(m.agents[c.owner].updatedAt || c.updatedAt))}</span></div>` : ""}
     <div class="meta">${S.attention.some((a) => a.status === "open" && a.cardId === c.id) ? `<span class="flag">Needs you</span>` : ""}${agentChip(m, c.owner)}${c.attempts > 1 ? `<span class="rework">rework ×${c.attempts - 1}</span>` : ""}</div>
     ${total ? `<div class="meta"><div class="bar"><i style="width:${(met / total) * 100}%"></i></div><span class="mono">${met}/${total}</span></div>` : ""}
   </button>`;
@@ -896,7 +909,8 @@ function flowSVG(m) {
   const nodeSVG = Object.keys(pos).map((id) => {
     const a = m.agents[id], p = pos[id], st = a.status || "idle";
     const mod = topModel(S.burn?.byAgent?.[id]?.models)[0];
-    const sub = (st === "working" && a.cardId ? `working · ${a.cardId}` : st) + (mod ? ` · ${modelName(mod)}` : "");
+    const sub = st === "working" && a.activity ? `${a.cardId ? a.cardId + " · " : ""}${a.activity}`
+      : (st === "working" && a.cardId ? `working · ${a.cardId}` : st) + (mod ? ` · ${modelName(mod)}` : "");
     const x = p.x - bw / 2, y = p.y - BH / 2;
     return `<g>
       <rect class="n-box r-${a.role}${st === "working" ? " working" : ""}" x="${x}" y="${y}" width="${bw}" height="${BH}" rx="7"/>

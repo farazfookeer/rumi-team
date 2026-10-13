@@ -181,6 +181,19 @@ Every run on a project that is new, nearly empty, or has no CLAUDE.md starts wit
 - **Before anyone else starts,** QA verifies R-0.
 - **For an existing project that already has a CLAUDE.md,** skip R-0. Agents follow the CLAUDE.md that's there.
 
+## Briefing subagents for live progress
+
+Every time you launch a subagent (business analyst, developer or QA), end its prompt with this block, so it can post progress to the board while it works:
+
+```
+BOARD: <boardUrl, or "none" if the board is disabled>
+PROJECT: <pid>
+YOU: <member id> (<name>)
+CARD: <card id, or "brief" for the business analyst>
+```
+
+Their `progress` events appear on the board straight away: on the card, in the activity log and in the diagram. You don't need to repeat their progress in your own events.
+
 ## Waiting for the user (board watch)
 
 The board can't wake you up by itself, so whenever you have to stop and wait for the user (the brief awaiting sign-off, or only team-blocked work left), schedule a check that wakes you while the session is idle:
