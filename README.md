@@ -133,6 +133,7 @@ When something is blocked or needs your OK, it shows on the board under **Guardr
 - **The team edits files in the folder you open.** Use a new folder, or a copy of your project, until you're comfortable with it.
 - **Risky steps need your OK.** Before installing new software, changing or deleting data, deleting files, or contacting outside services, the team stops and asks you under **Needs you**.
 - **It uses your Claude plan's usage.** Bigger requests use more. The **Token burn** panel shows exactly where it went.
+- **Each task gets the right-sized model.** Rumi picks a model for every task: the quickest, cheapest model for simple chores, Sonnet for everyday building and testing, and Opus for planning reviews and tricky or risky work. If a task fails its checks, the retry moves up a level. The plan you sign off says who does what, and the board shows the model on each card.
 - **Your board is private.** Only you can see it, unless you share it from the board's **Share** menu.
 - **Without a claude.ai sign-in** (for example, using Claude Code with an API key), the team still works but there's no live board. Progress shows in Claude Code instead.
 

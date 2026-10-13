@@ -491,7 +491,8 @@ function briefHTML(m) {
     <div class="brief-cols">
       <div><span class="label">Your requirement</span><blockquote>${esc(b.requirement)}</blockquote></div>
       <div><span class="label">Rumi's interpretation</span><p class="interp">${esc(b.interpretation)}</p>
-        ${b.stack ? `<span class="label" style="margin-top:8px">How it will be built</span><p class="stackline">${esc(b.stack)}</p>` : ""}</div>
+        ${b.stack ? `<span class="label" style="margin-top:8px">How it will be built</span><p class="stackline">${esc(b.stack)}</p>` : ""}
+        ${b.models ? `<span class="label" style="margin-top:8px">Who does the work</span><p class="stackline">${esc(b.models)}</p>` : ""}</div>
     </div>
     <div class="brief-cols">
       <div><span class="label">Definition of done${check ? ` · ${check.met.filter((x) => x === true).length}/${(b.dod || []).length} met at final check` : ""}</span><ol class="dod">${dod}</ol></div>
@@ -538,7 +539,9 @@ async function briefWrite(id, patch, summary) {
 
 /* Token burn: latest usage snapshot per session, summed. */
 const fmtTok = (n) => n >= 1e6 ? (n / 1e6).toFixed(n >= 1e7 ? 0 : 1) + "M" : n >= 1e3 ? Math.round(n / 1e3) + "k" : String(n || 0);
+const MODEL_ALIAS = { haiku: "Haiku", sonnet: "Sonnet", opus: "Opus", fable: "Fable" };  // planned tier; telemetry shows the exact model that ran
 function modelName(id) {
+  if (MODEL_ALIAS[String(id || "").toLowerCase()]) return MODEL_ALIAS[String(id).toLowerCase()];
   const m = String(id || "").replace(/^claude-/, "").replace(/\[.*\]$/, "").replace(/-\d{8}$/, "").match(/^([a-z]+)-([\d-]+)$/i);
   return m ? m[1][0].toUpperCase() + m[1].slice(1) + " " + m[2].split("-").join(".") : String(id || "Unknown model");
 }
@@ -861,7 +864,7 @@ function cardHTML(c) {
     <div class="row"><span class="mono prio">${esc(c.id)}</span>${S.burn.byCard[c.id] ? `<span class="tok" title="Tokens used on this requirement">${fmtTok(S.burn.byCard[c.id])} tok</span>` : ""}${c.priority != null ? `<span class="prio">P${esc(c.priority)}</span>` : ""}</div>
     <div class="t">${esc(c.title)}</div>
     ${ownerWorking ? `<div class="live-line"><span class="pulse-dot" aria-hidden="true"></span><span>${esc(m.agents[c.owner].activity || "Working on it")}</span><span class="since">${esc(ago(m.agents[c.owner].updatedAt || c.updatedAt))}</span></div>` : ""}
-    <div class="meta">${S.attention.some((a) => a.status === "open" && a.cardId === c.id) ? `<span class="flag">Needs you</span>` : ""}${agentChip(m, c.owner)}${c.attempts > 1 ? `<span class="rework">rework ×${c.attempts - 1}</span>` : ""}</div>
+    <div class="meta">${S.attention.some((a) => a.status === "open" && a.cardId === c.id) ? `<span class="flag">Needs you</span>` : ""}${agentChip(m, c.owner)}${c.model && c.column !== "done" ? `<span class="model" title="Model chosen for this card">${esc(modelName(c.model))}</span>` : ""}${c.attempts > 1 ? `<span class="rework">rework ×${c.attempts - 1}</span>` : ""}</div>
     ${total ? `<div class="meta"><div class="bar"><i style="width:${(met / total) * 100}%"></i></div><span class="mono">${met}/${total}</span></div>` : ""}
   </button>`;
 }
@@ -945,6 +948,7 @@ function logHTML(m, onlyCard) {
         ${e.cardId && !onlyCard ? `<button type="button" class="cardlink" data-card="${esc(e.cardId)}">${esc(e.cardId)}</button>` : ""}</div>
       <p class="sum">${esc(e.summary)}</p>
       ${e.rationale ? `<p class="why">${esc(e.rationale)}</p>` : ""}
+      ${e.model ? `<p class="sum" style="font-size:12.5px;color:var(--muted)"><span class="model">${esc(modelName(e.model))}</span> ${esc(e.modelReason || "")}</p>` : ""}
     </div></li>`).join("");
 }
 

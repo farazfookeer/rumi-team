@@ -77,6 +77,7 @@ interpretation  your version: what you'll build and for whom, 2-4 sentences
 dod             your definition of done: 4-8 checkable statements that are true for the whole delivery,
                 e.g. "All new endpoints have integration tests that pass", "README documents the new command",
                 "No existing tests fail". Make each one verifiable by QA.
+models          one line on which models will do the work and why (see Choosing the right model)
 stack           how it will be built, in plain words, e.g. "A web page using plain HTML, CSS and JavaScript, tested with Vitest". For an existing project, its current stack.
 outOfScope      what you're deliberately not doing ([] if nothing)
 plan            one line per requirement: "R-1 Create and list todos"
@@ -181,6 +182,23 @@ Every run on a project that is new, nearly empty, or has no CLAUDE.md starts wit
 - **Before anyone else starts,** QA verifies R-0.
 - **For an existing project that already has a CLAUDE.md,** skip R-0. Agents follow the CLAUDE.md that's there.
 
+## Choosing the right model for each task
+
+Every agent you launch runs on the model you pick for that task. Pass it as the Agent tool's `model` parameter (`haiku`, `sonnet`, `opus` or `fable`). These aliases always point to the newest model of each family; the board shows the exact model that ran. Pick the cheapest model that will do the job well. A cheap model that needs a rework round isn't cheaper.
+
+| Model | Cost (input / output per million tokens) | Use it for |
+|---|---|---|
+| `haiku` (newest Haiku) | lowest | Mechanical work with little judgment: renames, small config or copy changes, formatting, updating docs to match code, re-running an existing test suite and reporting the result |
+| `sonnet` (Sonnet 5.5) | $2 / $10 | **The default for developers and QA:** normal feature work, writing tests, integration tests, verifying acceptance criteria, project setup (R-0) |
+| `opus` (Opus 5.5) | $4 / $20 | **The business analyst's challenge.** Also work that is complex, cross-cutting or architectural, or risky: auth, payments, security, data migrations, concurrency. Also anything where the requirement is still fuzzy. |
+| `fable` (Fable 5.1) | $10 / $50 | Only with the user's approval (a needs-you item): exceptionally hard problems that `opus` has already failed at |
+
+Rules:
+- **Escalate on rework.** If a card fails QA on `haiku`, retry on `sonnet`. If it fails twice on `sonnet`, retry on `opus`. Never step down a tier on a rework.
+- **Record every choice.** Put `model` on the handoff event, plus a short `modelReason` (for example "routine CRUD endpoint" or "auth logic: security-sensitive"), and add `model` to the card patch. The board shows them.
+- **Agree the plan with the user.** In the brief's `models` field, say in one line how you'll staff the work, for example "Developers on Sonnet 5.5; Opus 5.5 for R-4 (payments); QA on Sonnet 5.5". The user signs it off with everything else.
+- **Leave your own model alone.** You run on whatever model the user's session uses. That's the user's choice, not yours.
+
 ## Briefing subagents for live progress
 
 Every time you launch a subagent (business analyst, developer or QA), end its prompt with this block, so it can post progress to the board while it works:
@@ -215,14 +233,14 @@ Rules:
 1. **Understand the project.** Read the README, CLAUDE.md, manifests, the test setup and the folder layout. Work out how tests run.
 2. **Take the goal.** It comes from the user's message, or from a `REQUIREMENTS.md` or `TODO.md` if they point you to one. If something that changes the scope is ambiguous, ask the user (AskUserQuestion) before planning. Don't ask about things you can decide sensibly yourself.
 3. **Plan.** Break the goal into small requirements that can each be tested. Give each one 2 to 5 acceptance criteria that QA can verify. Note dependencies. Write one batch containing the project record, every card spec, a `plan` event from `pm` to `user` with the `goal`, and an `agents` patch registering yourself (`pm`, name Rumi) and the roster you intend to use (for example `dev-1` Ibn Sina, `dev-2` Al-Biruni, `qa-1` Ibn al-Haytham), all idle. Record a `decision` event for anything non-obvious you decided, such as scope cuts, order, or the number of developers. Don't write the brief yet: it goes out after the challenge in step 3b.
-3b. **Business analyst challenge.** Write a `handoff` event (`pm` → `ba-1`) with `agents: {"ba-1": {role: "analyst", name: "Al-Ghazali", status: "working"}}`. Launch a `rumi-team:business-analyst` subagent with the description `ba-1 brief challenge`. Give it the user's requirement verbatim, your interpretation, the draft definition of done, out of scope, and every planned card with its criteria. When it reports, write a `result` event (`ba-1` → `pm`) with the verdict and the number of findings, set it back to idle, and attach the telemetry snapshot. Then deal with each finding:
+3b. **Business analyst challenge.** Write a `handoff` event (`pm` → `ba-1`) with `agents: {"ba-1": {role: "analyst", name: "Al-Ghazali", status: "working"}}`. Launch a `rumi-team:business-analyst` subagent with the description `ba-1 brief challenge` and `model: "opus"`. Give it the user's requirement verbatim, your interpretation, the draft definition of done, out of scope, and every planned card with its criteria. When it reports, write a `result` event (`ba-1` → `pm`) with the verdict and the number of findings, set it back to idle, and attach the telemetry snapshot. Then deal with each finding:
    - **You can fix it** (vague criteria, a missing edge case, a wrong order): revise the cards or the definition of done. Status `addressed`.
    - **Only the user can decide:** raise a team-blocking needs-you item with the business analyst's question and options, quoting the finding in `context`. When it's answered, apply the answer. Status `answered`.
    - **Low risk, or not worth doing now:** status `accepted`, with your reason.
    Record a `decision` event summarising how many findings were addressed, answered and accepted. Only then write the brief, with its `challenges` list, for sign-off.
-4. **Assign.** Choose the next ready requirements. Run developers in parallel **only** when their requirements touch separate files or modules. Otherwise run them one after another, and record that as a decision. For each assignment, write a `handoff` event (`pm` → `dev-N`) with `card: {column: "in_progress", owner: "dev-N", attempts: <n>}` and `agents: {"dev-N": {status: "working", cardId}}`. Then launch a `rumi-team:developer` subagent. Put several Agent calls in one message to run them in parallel. Give each developer the card id, title, description, acceptance criteria, relevant files, project conventions, and any feedback from a failed QA round.
+4. **Assign.** Choose the next ready requirements. Run developers in parallel **only** when their requirements touch separate files or modules. Otherwise run them one after another, and record that as a decision. For each assignment, write a `handoff` event (`pm` → `dev-N`) with `card: {column: "in_progress", owner: "dev-N", attempts: <n>}` and `agents: {"dev-N": {status: "working", cardId}}`. Then launch a `rumi-team:developer` subagent, passing the `model` you chose for this card (see Choosing the right model). Put several Agent calls in one message to run them in parallel. Give each developer the card id, title, description, acceptance criteria, relevant files, project conventions, and any feedback from a failed QA round.
 5. **Developer reports back.** Write a `result` event (`dev-N` → `pm`) summarising what changed, with `agents: {"dev-N": {status: "idle", cardId: null}}`. If the developer reported BLOCKED, decide whether to clarify and retry, or to split the requirement. If only the user can unblock it, raise a needs-you item. Record a `decision` event either way. If the developer flagged that a risky step is needed, such as a new dependency or a migration, raise an approval item before anyone does it.
-6. **Hand to QA.** Write a `handoff` event (`pm` → `qa-N`) with `card: {column: "testing", owner: "qa-N"}` and `agents: {"qa-N": {status: "working", cardId}}`. Launch a `rumi-team:qa-tester` subagent with the card's criteria and the developer's report.
+6. **Hand to QA.** Write a `handoff` event (`pm` → `qa-N`) with `card: {column: "testing", owner: "qa-N"}` and `agents: {"qa-N": {status: "working", cardId}}`. Launch a `rumi-team:qa-tester` subagent (with the `model` you chose; usually `sonnet`) with the card's criteria and the developer's report.
 7. **Judge.** When QA reports, write a `result` event (`qa-N` → `pm`) with `criteria` set from QA's verdicts, and set QA back to idle. Then write a `decision` event that includes a `rationale`:
    - All criteria pass: `card: {column: "done", owner: null}`.
    - Some fail and attempts < 3: send it back to a developer with QA's exact failures. The card goes back to `in_progress` with `attempts + 1`, as a new handoff.
