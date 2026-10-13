@@ -217,6 +217,16 @@ svg.flow { display: block; margin: 0 auto; max-width: none; }
 .mini { font-size: 10.5px; padding: 0 6px; }
 .mini::before { width: 5px; height: 5px; }
 
+/* Guardrails */
+.guard { display: grid; gap: 8px; }
+.guard-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.guard-list li { display: grid; grid-template-columns: auto auto minmax(0, 1fr); gap: 4px 10px; align-items: start; padding: 8px 10px; border-radius: 6px; background: var(--sunk); font-size: 13px; }
+.guard-list .dec { font: 600 10.5px var(--f-mono); text-transform: uppercase; padding: 2px 6px; border-radius: 3px; color: var(--surface); }
+.dec.deny { background: var(--bad); } .dec.ask { background: var(--warn); }
+.guard-list .what { font-family: var(--f-mono); font-size: 12px; overflow-wrap: anywhere; }
+.guard-list .why { grid-column: 3; color: var(--muted); overflow-wrap: anywhere; }
+.stackline { margin: 0; font-size: 14px; }
+
 /* Token burn */
 .burn { display: grid; gap: 14px; }
 .burn-top { display: flex; flex-wrap: wrap; gap: 8px 28px; align-items: baseline; }
@@ -468,7 +478,8 @@ function briefHTML(m) {
       <span class="label mono">${esc(b.id)}${older ? ` · revision ${older + 1}` : ""}</span></div>
     <div class="brief-cols">
       <div><span class="label">Your requirement</span><blockquote>${esc(b.requirement)}</blockquote></div>
-      <div><span class="label">Rumi's interpretation</span><p class="interp">${esc(b.interpretation)}</p></div>
+      <div><span class="label">Rumi's interpretation</span><p class="interp">${esc(b.interpretation)}</p>
+        ${b.stack ? `<span class="label" style="margin-top:8px">How it will be built</span><p class="stackline">${esc(b.stack)}</p>` : ""}</div>
     </div>
     <div class="brief-cols">
       <div><span class="label">Definition of done${check ? ` · ${check.met.filter((x) => x === true).length}/${(b.dod || []).length} met at final check` : ""}</span><ol class="dod">${dod}</ol></div>
@@ -521,7 +532,7 @@ const tokTotal = (t) => (t.in || 0) + (t.out || 0) + (t.cacheRead || 0) + (t.cac
 function burn(m) {
   const latest = {};
   for (const e of m.asc) if (e.usage && e.usage.session) latest[e.usage.session] = e.usage;
-  const byAgent = {}, byCard = {}, byModel = {}, access = {}, all = { in: 0, out: 0, cacheRead: 0, cacheWrite: 0 };
+  const byAgent = {}, byCard = {}, byModel = {}, access = {}, guard = [], all = { in: 0, out: 0, cacheRead: 0, cacheWrite: 0 };
   for (const u of Object.values(latest)) {
     for (const [id, t] of Object.entries(u.byAgent || {})) {
       const a = (byAgent[id] ||= { in: 0, out: 0, cacheRead: 0, cacheWrite: 0, runs: 0 });
@@ -535,6 +546,7 @@ function burn(m) {
       for (const k of ["in", "out", "cacheRead", "cacheWrite"]) g[k] += t[k] || 0;
     }
     for (const [c, n] of Object.entries(u.byCard || {})) byCard[c] = (byCard[c] || 0) + n;
+    guard.push(...(u.guard || []));
     for (const [id, rows] of Object.entries(u.access || {})) {
       const into = (access[id] ||= {});
       for (const r of rows || []) {
@@ -545,7 +557,8 @@ function burn(m) {
       }
     }
   }
-  return { byAgent, byCard, byModel, all, access: Object.fromEntries(Object.entries(access).map(([id, o]) => [id, Object.values(o)])), sessions: Object.keys(latest).length, total: tokTotal(all) };
+  guard.sort((a, b) => String(b.ts).localeCompare(String(a.ts)));
+  return { byAgent, byCard, byModel, all, guard, access: Object.fromEntries(Object.entries(access).map(([id, o]) => [id, Object.values(o)])), sessions: Object.keys(latest).length, total: tokTotal(all) };
 }
 function burnHTML(m) {
   const b = S.burn;
@@ -580,17 +593,29 @@ function burnHTML(m) {
 /* Data & external access, from the agents' own tool calls. */
 const KIND_LABEL = { web: "Website / API", search: "Web search", database: "Database", "data-file": "Data file", connector: "Connector", package: "Package install", secrets: "Secrets file" };
 const isFlag = (r) => r.kind === "secrets" || (r.write && ["database", "web", "connector"].includes(r.kind));
+function guardHTML(m) {
+  const g = S.burn.guard || [];
+  if (!g.length) return `<div class="guard"><span class="label">Guardrails</span><p style="margin:0;color:var(--muted);font-size:13px">Nothing blocked so far. Rumi's guardrails block file changes before sign-off and any use of secrets, and ask you before installs, database writes, commits and outside services.</p></div>`;
+  const d = g.filter((x) => x.decision === "deny").length, a = g.length - d;
+  return `<div class="guard"><span class="label">Guardrails · ${d} blocked · ${a} asked you</span>
+    <ul class="guard-list">${g.slice(0, 30).map((x) => `<li><span class="dec ${esc(x.decision)}">${x.decision === "deny" ? "Blocked" : "Asked"}</span>
+      <span>${x.member === "other" ? `<span class="chip c-user">Other</span>` : agentChip(m, x.member)}</span>
+      <span class="what">${esc(x.tool)} · ${esc(x.detail)}</span>
+      <span class="why">${esc(String(x.reason || "").replace(/^Guardrail: /, ""))} <span class="mono">${esc(hhmm(x.ts))}</span></span></li>`).join("")}</ul></div>`;
+}
 function accessHTML(m) {
   const acc = S.burn.access || {};
   const ids = Object.keys(acc).filter((id) => acc[id].length);
-  if (!ids.length) return `<section class="panel access" aria-labelledby="h-acc"><div class="section-head"><h2 id="h-acc">Data &amp; external access</h2></div>
+  if (!ids.length) return `<section class="panel access" aria-labelledby="h-acc"><div class="section-head"><h2 id="h-acc">Data, external access &amp; guardrails</h2></div>
+    ${guardHTML(m)}
     <p style="margin:0;color:var(--muted)">Websites, databases, data files and connectors the agents touch appear here after each agent reports back.</p></section>`;
   const all = ids.flatMap((id) => acc[id]);
   const uniq = (kinds) => new Set(all.filter((r) => kinds.includes(r.kind)).map((r) => r.target)).size;
   const flags = all.filter(isFlag).length;
   const writes = all.filter((r) => r.write && ["data-file"].includes(r.kind)).length;
   return `<section class="panel access" aria-labelledby="h-acc">
-    <div class="section-head"><h2 id="h-acc">Data &amp; external access</h2><span class="label">from the agents' tool calls · Rumi checks it against the brief</span></div>
+    <div class="section-head"><h2 id="h-acc">Data, external access &amp; guardrails</h2><span class="label">from the agents' tool calls · enforced by hooks</span></div>
+    ${guardHTML(m)}
     <div class="acc-sum">
       <span><b>${uniq(["web"])}</b> sites and APIs</span><span><b>${uniq(["search"])}</b> searches</span>
       <span><b>${uniq(["database", "data-file"])}</b> data sources</span><span><b>${uniq(["connector"])}</b> connector actions</span>

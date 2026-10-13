@@ -60,9 +60,10 @@ You don't need to know how to code.
 1. **Rumi plans the work** and writes a **definition of done**: a short checklist of what "finished" means.
 2. **Al-Ghazali questions the plan** for gaps. Rumi fixes what it can, and asks you about anything only you can decide.
 3. **You sign off the plan** on the board (or by replying in Claude Code). **Nothing gets built until you do.** If something's wrong, press **Request changes** and say what you want.
-4. **The developers build it** and **the testers check it.** Work that fails a test goes back to be fixed.
-5. **If the team needs you,** a question appears at the top of the board under **Needs you**, and in Claude Code. Answer in either place.
-6. **When it's done,** Rumi gives you a summary of what was built, what was checked, and anything left over.
+4. **For a new project, the team sets up the workspace first:** sensible folders, a working run and test setup, and a `CLAUDE.md` file describing your project, so every future Claude session understands it.
+5. **The developers build it** and **the testers check it.** Work that fails a test goes back to be fixed.
+6. **If the team needs you,** a question appears at the top of the board under **Needs you**, and in Claude Code. Answer in either place.
+7. **When it's done,** Rumi gives you a summary of what was built, what was checked, and anything left over.
 
 ### Your board shows
 
@@ -75,6 +76,31 @@ You don't need to know how to code.
 - **Tool calls:** every action each agent took, for checking afterwards. Passwords and keys are hidden.
 - **Token burn:** how much Claude usage each agent and each model used.
 - **Data and external access:** websites, databases and files the agents touched. Anything risky is flagged in red.
+
+### Just want a project set up?
+
+To get a ready-to-work folder without a full build, open an empty folder in Claude Code and type:
+
+```
+/rumi-team:scaffold a website for my bakery with a menu and opening hours
+```
+
+You get folders, a working starting point, a README, and a `CLAUDE.md` tailored to your project.
+
+---
+
+## Safety guardrails
+
+While Rumi's team is working, built-in guardrails check **every action, by every agent**, before it happens. These are hard rules enforced by the plugin, not just instructions:
+
+| | What happens |
+|---|---|
+| **Blocked** | Changing any project files before you sign off the plan |
+| **Blocked** | Reading or changing secret files (`.env`, keys, passwords) |
+| **Blocked** | Deleting anything outside the project folder, and force-pushing code |
+| **Asks you first** | Installing software, changing data in a database, saving to git (commit or push), contacting an outside website or service, and sending or changing things in your connected apps (email, drive and so on) |
+
+When something is blocked or needs your OK, it shows on the board under **Guardrails**. "Asks you first" appears as a normal Claude Code approval prompt. If you're not there to answer, the answer is no. The guardrails switch off when the run ends, so your normal Claude Code use is unaffected.
 
 ---
 
@@ -123,6 +149,10 @@ plugins/rumi-team/
   agents/                           the team: rumi, business-analyst, developer, qa-tester
   skills/rumi/                      the /rumi-team:rumi command
   skills/setup/                     the /rumi-team:setup command (creates your board)
+  skills/scaffold/                  the /rumi-team:scaffold command (sets up a project and its CLAUDE.md)
+  hooks/hooks.json                  the guardrails: checks every tool call during a run
+  scripts/guard.py                  the guardrail rules
+  scripts/run_state.py              switches the guardrails on and off for a run
   board/board.html                  the live board page
   scripts/telemetry.py              reads token use, tool calls and data access from Claude Code's logs
   scripts/tree.py                   takes a snapshot of the project's folders for the board

@@ -13,6 +13,7 @@ Prints one compact JSON object for the board's `usage` event field:
   byModel  tokens per model
   access   per member: websites, searches, databases, data files, connectors,
            package installs and secrets files touched, read or write, with counts
+  guard    guardrail blocks and approval requests from the hook (newest 100)
 
 With --audit-dir, it also writes every tool call made since the last run as
 JSON chunk files (one board document each) into DIR/batch-<n>/, and prints that
@@ -264,7 +265,7 @@ def main():
     if not hits:
         sys.exit(f"No transcript found for session {sid}")
     main_path = hits[0]
-    by_agent, by_card, by_model, access, calls = {}, {}, {}, {}, {}
+    by_agent, by_card, by_model, access, calls, agent_member = {}, {}, {}, {}, {}, {}
 
     t, models, acc, cl = scan(main_path, main=True)
     add(by_agent.setdefault("pm", {}), t, models, by_model)
@@ -280,6 +281,7 @@ def main():
         desc = str(meta.get("description", ""))
         m = MEMBER.match(desc)
         member = m.group(1) if m else "other"
+        agent_member[os.path.basename(path)[len("agent-"):-len(".jsonl")]] = member
         t, models, acc, cl = scan(path)
         add(by_agent.setdefault(member, {}), t, models, by_model)
         merge_access(access.setdefault(member, {}), acc)
@@ -296,6 +298,19 @@ def main():
         if rows:
             access_out[member] = rows[:MAX_ACCESS_PER_MEMBER]
 
+    guard = []
+    try:
+        for line in open(os.path.expanduser(f"~/.claude/rumi-team/guard/{sid}.jsonl"), encoding="utf-8"):
+            try:
+                g = json.loads(line)
+            except ValueError:
+                continue
+            aid = g.get("agentId")
+            guard.append({"ts": g.get("ts"), "member": agent_member.get(aid, "other") if aid else "pm", "tool": g.get("tool"),
+                          "detail": g.get("detail"), "decision": g.get("decision"), "reason": g.get("reason")})
+    except OSError:
+        pass
+
     if audit_dir:
         export_calls(audit_dir, sid, calls)
 
@@ -306,6 +321,7 @@ def main():
         "byCard": by_card,
         "byModel": by_model,
         "access": access_out,
+        "guard": guard[-100:],
     }, separators=(",", ":")))
 
 
