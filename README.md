@@ -161,6 +161,10 @@ claude plugin uninstall rumi-team@faraz-agents
 
 **I want a fresh board**: type `/rumi-team:setup make me a new board`.
 
+**After updating the plugin**: type `/rumi-team:setup update my board` to get the newest version of the board page. Your data stays as it is.
+
+**I signed off on the board but nothing happened**: Rumi checks the board every minute while it waits. If Rumi's Claude Code session was closed, open it again and type `continue`.
+
 **Too many "allow this?" pop-ups**: type `/rumi-team:setup` and ask it to allow board updates without asking.
 
 ---

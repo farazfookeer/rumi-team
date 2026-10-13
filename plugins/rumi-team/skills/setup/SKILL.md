@@ -1,13 +1,13 @@
 ---
 name: setup
-description: Create the user's own private Agent Team Board on claude.ai and connect Rumi's team to it. Use when the user runs /rumi-team:setup, says "set up the board" or "make me a new board", or when Rumi finds no board in ~/.claude/rumi-team/config.json.
+description: Create, or update, the user's own private Agent Team Board on claude.ai and connect Rumi's team to it. Use when the user runs /rumi-team:setup, says "set up the board", "make me a new board" or "update my board", or when Rumi finds no board in ~/.claude/rumi-team/config.json.
 ---
 
 Set up the user's **Agent Team Board**: a private live page on their claude.ai account where Rumi's team shows its work. Talk to the user in plain, friendly language. Many users aren't technical, so don't mention file paths or tool names unless something goes wrong.
 
 The plugin root is the directory two levels above this skill's base directory (it contains `board/`, `agents/` and `scripts/`).
 
-1. **Check for an existing board.** Read `~/.claude/rumi-team/config.json`. If it has a `boardUrl` and the user didn't ask for a new board, tell them they already have one and give them the link. If they asked about approval pop-ups, do step 6. Otherwise stop.
+1. **Check for an existing board.** Read `~/.claude/rumi-team/config.json`. If it has a `boardUrl` and the user didn't ask for a new board, tell them they already have one and give them the link. If they asked about approval pop-ups, do step 6. If they asked to **update** their board (after a plugin update), do step 3, then republish the copy to their existing board by passing `url` = their `boardUrl` (read the artifact first if the tool asks). Leave out `capabilities` so the stored access rules are kept. Their data stays; only the page changes. Otherwise stop.
 
 2. **Check that boards are available.** The board needs the `Artifact` and `ArtifactData` tools, which come with signing in to Claude Code with a claude.ai account. If either is missing, even after a ToolSearch for it, tell the user plainly: "The live board needs you to be signed in to Claude Code with your claude.ai account. The team still works without it; you just won't see the live board." Write `{"boardUrl": null, "boardDisabled": true}` to the config file so Rumi doesn't ask again, and stop.
 

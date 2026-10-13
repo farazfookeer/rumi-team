@@ -454,7 +454,7 @@ function needsHTML() {
   const open = openItems();
   const waiting = S.attention.filter((a) => a.status === "answered");
   const past = S.attention.filter((a) => a.status === "resolved").slice(0, 8);
-  const waitHTML = waiting.length ? `<div class="waiting">${waiting.map((a) => `<span><b>${esc(a.id)}</b> answered “${esc(trunc(a.answer, 80))}”. Rumi picks this up at the next step.</span>`).join("")}</div>` : "";
+  const waitHTML = waiting.length ? `<div class="waiting">${waiting.map((a) => `<span><b>${esc(a.id)}</b> answered “${esc(trunc(a.answer, 80))}”. Rumi carries on within about a minute.</span>`).join("")}</div>` : "";
   const pastHTML = past.length ? `<details class="past"><summary>Recently resolved (${past.length})</summary><ul>${past.map((a) => `<li><b>${esc(a.id)}</b> ${esc(a.question)}: “${esc(trunc(a.answer, 60))}”${a.resolution ? `. ${esc(a.resolution)}` : ""}</li>`).join("")}</ul></details>` : "";
   if (!open.length) return `<section class="needs" id="needs" aria-labelledby="h-needs">
     <div class="calm"><h2 id="h-needs" style="font-size:17px;color:var(--ink)">Needs you</h2><strong>Nothing is waiting on you.</strong><span>Rumi adds questions and approvals here before the team goes further.</span></div>
@@ -502,6 +502,9 @@ function briefHTML(m) {
         <button type="button" class="send" data-changes="${esc(b.id)}"${busy ? " disabled" : ""}>Request changes</button></div>
       ${S.errs[b.id] ? `<p class="err" role="alert" style="color:var(--bad);margin:0">${esc(S.errs[b.id])}</p>` : ""}
     </div>` : ""}
+    ${b.status === "signed" && b.signedAt && !m.asc.some((e) => e.from && e.from !== "user" && String(e.ts) > String(b.signedAt)) ? `<div class="signoff">
+      <p class="gate">Signed off. Rumi checks the board every minute and will start building shortly.</p>
+      <p style="margin:0;color:var(--muted);font-size:13px">Nothing happening after a few minutes? Rumi's Claude Code session may have been closed. Open it again and type <code>continue</code>.</p></div>` : ""}
     ${b.status === "changes" ? `<div class="signoff"><p class="gate">You asked for: “${esc(b.feedback)}”. Rumi is revising the brief. The new version will appear here for sign-off.</p></div>` : ""}
   </section>`;
 }

@@ -91,7 +91,7 @@ signedAt, signedVia ("board" | "terminal"), feedback (the user's requested chang
 - **Challenge before sign-off.** After drafting the plan and definition of done, and before writing the brief, hand the draft to Al-Ghazali (see How you run a goal, step 3b). Every finding must be addressed, answered or accepted before the brief goes to the user. Open questions go out as needs-you items first.
 - **After the challenge**, write the brief with `status: "awaiting"`, plus a `blocked` event `pm` → `user` ("Definition of done needs your sign-off (B-n)"), in the plan step's batch. Keep the `version` the write returns. Tell the user in the terminal and show them the definition of done there too.
 - **As soon as you see the brief `signed`** (on the board or in the terminal), run `run_state.py signed B-n`. Until then the hooks block every file edit.
-- **Build nothing until the brief is `signed`.** Assigning, starting subagents and editing code all wait. Check its status at each step boundary, the same way as the queue.
+- **Build nothing until the brief is `signed`.** Assigning, starting subagents and editing code all wait. Check its status at each step boundary, the same way as the queue. While the brief is awaiting sign-off and nothing else can run, **start the board watch** (see Waiting for the user) and end your turn. Your sign-off click on the board must be enough to start the build: never require the user to also type something.
 - If the user signs off in the terminal, `update` the brief yourself: `status: "signed"`, `signedVia: "terminal"`, `signedAt`.
 - If `status` is `"changes"`, read `feedback`, revise the plan and the cards, and write a new brief `B-(n+1)` with `status: "awaiting"` (and run `run_state.py unsigned` if building had started). If the changes are substantive (new scope, new data sources, new external services), run Al-Ghazali again on the revision first. In the same batch, `update` the old one to `superseded`. Wait again.
 - Treat the signed definition of done as the contract. If the scope has to change later, raise it as a needs-you item. If the definition of done itself changes, write a new brief for sign-off.
@@ -147,7 +147,7 @@ Don't raise items for things you can sensibly decide yourself. Log those as `dec
 **Check the queue at every step boundary**: before each assignment and after each subagent returns. `query` the attention collection with `where: [["status", "in", ["open", "answered"]]]`.
 - For each `answered` item, apply the answer. `update` it to `status: "resolved"` with a `resolution`, using the `version` from the query. In the same batch, write a `decision` event whose `rationale` cites the answer and unblocks the card: move it back to `backlog`, or to `in_progress` if you reassign it at once. If the answer is "Stop" or a rejection, act on it and record the outcome.
 - While any `team` item is open, start no new assignments. Subagents that are already running may finish.
-- If every remaining piece of work is waiting on open items, stop and tell the user: "<n> items need you. Answer on the board or reply here, then say continue." End your turn and wait.
+- If every remaining piece of work is waiting on open items, **start the board watch** (see Waiting for the user), tell the user "<n> items need you. Answer on the board or reply here, and I'll carry on as soon as you do.", and end your turn.
 - If the user answers in the terminal instead, write the answer onto the item yourself: `status: "resolved"`, `answeredVia: "terminal"`, plus `answer` and `resolution`, using the version you hold.
 
 ## Guardrails (enforced by hooks)
@@ -180,6 +180,21 @@ Every run on a project that is new, nearly empty, or has no CLAUDE.md starts wit
 - **After sign-off,** assign R-0 to `dev-1` like any card. Tell the developer to follow `${CLAUDE_PLUGIN_ROOT}/skills/scaffold/SKILL.md`, give it that absolute path, and give it the signed brief.
 - **Before anyone else starts,** QA verifies R-0.
 - **For an existing project that already has a CLAUDE.md,** skip R-0. Agents follow the CLAUDE.md that's there.
+
+## Waiting for the user (board watch)
+
+The board can't wake you up by itself, so whenever you have to stop and wait for the user (the brief awaiting sign-off, or only team-blocked work left), schedule a check that wakes you while the session is idle:
+
+1. Call `CronList`. If a job whose prompt starts with `[rumi-watch]` already exists, don't add another.
+2. Otherwise call `CronCreate` with `cron: "* * * * *"`, `recurring: true` and this prompt, filling in the board URL and project id:
+   `[rumi-watch] Board check for <pid> on <boardUrl>. Read the newest brief and the needs-you items with status open or answered. If the brief is now signed, or any item is answered, or the user replied: delete every [rumi-watch] job (CronList, then CronDelete) and continue the run from where it stopped. If nothing changed, reply with exactly "Waiting for you on the board." and do nothing else.`
+3. Tell the user in one line: "I'm checking the board every minute. Sign off (or answer) there and I'll carry on automatically."
+
+Rules:
+- **Delete the watch as soon as you're working again,** whether the board woke you, the user replied in the terminal, or the run ended. Never leave a `[rumi-watch]` job behind.
+- **Keep quiet checks cheap.** When nothing changed, make one read (a `query` on attention and a `get` on the brief) and give the one-line reply. Write nothing to the board.
+- **Slow down after 30 minutes.** If the watch has fired 30 times with no change, replace it with the same job at `cron: "*/10 * * * *"`, and tell the user you're now checking every 10 minutes.
+- If `CronCreate` isn't available, fall back to asking the user to reply "continue" here after acting on the board.
 
 ## How you run a goal
 
