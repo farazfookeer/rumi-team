@@ -1,6 +1,15 @@
 # Rumi's agent team
 
+**A product manager, analyst, developers and QA for Claude Code, with a live board, your sign-off and real guardrails.**
+
+![A build in progress: cards move across the board and each agent's current task updates live](docs/images/demo.gif)
+
 A small team of AI agents that builds software for you inside Claude Code, while you watch on a live board.
+
+```
+claude plugin marketplace add farazfookeer/rumi-team
+claude plugin install rumi-team@faraz-agents
+```
 
 You describe what you want in plain words. The team plans it, checks the plan with you, builds it, tests it, and shows every step as it happens.
 
@@ -13,9 +22,9 @@ You describe what you want in plain words. The team plans it, checks the plan wi
 
 The team is named after philosophers and scientists of the Islamic golden age.
 
-![The Agent Team Board: the brief and definition of done, waiting for sign-off](docs/images/overview.png)
+<sub>The demo and screenshots show the board with example data.</sub>
 
-<sub>Screenshots show the board with example data.</sub>
+![The Agent Team Board: the brief and definition of done, waiting for sign-off](docs/images/overview.png)
 
 ---
 
