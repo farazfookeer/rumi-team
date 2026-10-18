@@ -1,6 +1,8 @@
 {
   "name": "rumi-team",
   "version": "1.6.0",
-  "description": "Rumi (product manager), developer and QA agents that build any project and stream progress to a live Agent Team Board.",
-  "author": { "name": "Faraz Fookeer" }
+  "description": "Rumi (product manager), a business analyst, developers and QA that build any project: you sign off the plan and cost estimate, then watch a live board with guardrails, audit trail and spend tracking.",
+  "author": {
+    "name": "Faraz Fookeer"
+  }
 }

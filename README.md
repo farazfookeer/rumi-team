@@ -80,7 +80,7 @@ You don't need to know how to code.
 
 ### Your board shows
 
-**Brief and definition of done.** Your request, Rumi's understanding of it, how it will be built, the checklist you sign off, and the business analyst's findings. *(Shown at the top of this page.)*
+**Brief and definition of done.** Your request, Rumi's understanding of it, how it will be built and by which models, **the estimated cost**, the checklist you sign off, and the business analyst's findings. *(Shown at the top of this page.)*
 
 **Needs you.** Questions and approvals waiting for you. Answer with one click.
 
@@ -102,7 +102,7 @@ You don't need to know how to code.
 
 ![The tool call audit log](docs/images/audit.png)
 
-**Token burn.** How much Claude usage each agent and each model used.
+**Token burn and cost.** What's been spent so far against the estimate, with the point where the team pauses to ask you, plus tokens and cost for each agent and each model.
 
 ![Token use per agent and per model](docs/images/burn.png)
 
