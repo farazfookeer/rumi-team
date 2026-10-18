@@ -1,0 +1,21 @@
+{
+  "checked": "2026-10-18",
+  "source": "https://platform.claude.com/docs/en/about-claude/pricing",
+  "currency": "USD",
+  "unit": "per million tokens",
+  "note": "API list prices. On a Pro or Max plan you don't pay per token; these show the API-equivalent cost. Update this file when prices change.",
+  "aliases": {
+    "haiku": "claude-haiku-5-5",
+    "sonnet": "claude-sonnet-5-5",
+    "opus": "claude-opus-5-5",
+    "fable": "claude-fable-5-1"
+  },
+  "models": {
+    "claude-fable-5-1":  { "in": 10,   "cw5m": 12.5,  "cw1h": 20,   "cr": 0.25, "out": 50 },
+    "claude-opus-5-5":   { "in": 4,    "cw5m": 5,     "cw1h": 8,    "cr": 0.20, "out": 20 },
+    "claude-sonnet-5-5": { "in": 2,    "cw5m": 2.5,   "cw1h": 4,    "cr": 0.10, "out": 10 },
+    "claude-haiku-5-5":  { "in": 0.10, "cw5m": 0.125, "cw1h": 0.20, "cr": 0.01, "out": 0.50,
+                           "over": { "promptTokens": 100000, "in": 0.50, "cw5m": 0.625, "cw1h": 1, "cr": 0.05, "out": 2.50 } },
+    "claude-haiku-4-5":  { "in": 1,    "cw5m": 1.25,  "cw1h": 2,    "cr": 0.10, "out": 5 }
+  }
+}

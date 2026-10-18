@@ -70,7 +70,7 @@ You don't need to know how to code.
 
 ### What happens next
 
-1. **Rumi plans the work** and writes a **definition of done**: a short checklist of what "finished" means.
+1. **Rumi plans the work** and writes a **definition of done**: a short checklist of what "finished" means. It also **estimates the cost**: a likely range in dollars and tokens, broken down by requirement.
 2. **Al-Ghazali questions the plan** for gaps. Rumi fixes what it can, and asks you about anything only you can decide.
 3. **You sign off the plan** on the board (or by replying in Claude Code). **Nothing gets built until you do.** If something's wrong, press **Request changes** and say what you want.
 4. **For a new project, the team sets up the workspace first:** sensible folders, a working run and test setup, and a `CLAUDE.md` file describing your project, so every future Claude session understands it.
@@ -141,7 +141,7 @@ When something is blocked or needs your OK, it shows on the board under **Guardr
 
 - **The team edits files in the folder you open.** Use a new folder, or a copy of your project, until you're comfortable with it.
 - **Risky steps need your OK.** Before installing new software, changing or deleting data, deleting files, or contacting outside services, the team stops and asks you under **Needs you**.
-- **It uses your Claude plan's usage.** Bigger requests use more. The **Token burn** panel shows exactly where it went.
+- **You see the cost before you agree.** The plan you sign off includes an estimated cost range at API prices (on a Pro or Max plan, it counts against your usage limits instead). The board tracks spend against the estimate, and **if spending passes 150% of the estimate, the team pauses and asks you** before continuing. Estimates get more accurate as you use it, because each finished run teaches it what your projects actually cost.
 - **Each task gets the right-sized model.** Rumi picks a model for every task: the quickest, cheapest model for simple chores, Sonnet for everyday building and testing, and Opus for planning reviews and tricky or risky work. If a task fails its checks, the retry moves up a level. The plan you sign off says who does what, and the board shows the model on each card.
 - **Your board is private.** Only you can see it, unless you share it from the board's **Share** menu.
 - **Without a claude.ai sign-in** (for example, using Claude Code with an API key), the team still works but there's no live board. Progress shows in Claude Code instead.
@@ -194,6 +194,8 @@ plugins/rumi-team/
   board/board.html                  the live board page
   scripts/telemetry.py              reads token use, tool calls and data access from Claude Code's logs
   scripts/tree.py                   takes a snapshot of the project's folders for the board
+  scripts/estimate.py               estimates cost before building, watches for overruns, learns from past runs
+  scripts/rates.json                model prices used for estimates and spend (update when prices change)
 ```
 
 Your board's address is saved in `~/.claude/rumi-team/config.json`.

@@ -28,10 +28,14 @@ import sys
 from datetime import datetime, timezone
 from urllib.parse import urlparse
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from pricing import price  # noqa: E402
+
 MEMBER = re.compile(r"^(pm|dev-\d+|qa-\d+|ba-\d+)\b")
 CALLS_PER_CHUNK = 150
 CARD = re.compile(r"\b(R-\d+)\b")
-KEYS = ("in", "out", "cacheRead", "cacheWrite")
+KEYS = ("in", "out", "cacheRead", "cacheWrite")   # token counts (summed into totals)
+EXTRA = ("cacheWrite1h", "cost")                   # part of cacheWrite cached for 1 hour; API-equivalent USD
 MAX_ACCESS_PER_MEMBER = 40
 
 URL = re.compile(r"https?://[^\s'\"<>)\]]+")
@@ -170,7 +174,7 @@ def describe(name, inp):
 
 def scan(path, main=False):
     """Return (tokens, {model: tokens}, {(kind, target, write): [count, first, last]}, [tool calls])."""
-    t, models, last, seen_tools, access = dict.fromkeys(KEYS, 0), {}, {}, set(), {}
+    t, models, last, seen_tools, access = dict.fromkeys(KEYS + EXTRA, 0), {}, {}, set(), {}
     calls, by_id, out_chars = [], {}, {}
     try:
         lines = open(path, encoding="utf-8")
@@ -224,28 +228,31 @@ def scan(path, main=False):
             "out": u.get("output_tokens", 0) or 0,
             "cacheRead": u.get("cache_read_input_tokens", 0) or 0,
             "cacheWrite": u.get("cache_creation_input_tokens", 0) or 0,
+            "cacheWrite1h": (u.get("cache_creation") or {}).get("ephemeral_1h_input_tokens", 0) or 0,
         })
     # Subagent transcripts log each response before it finishes, so their output_tokens can be far too low.
     # Use the larger of the logged count and an estimate from the logged content (about 4 characters a token).
     for key, (model, row) in last.items():
         row["out"] = max(row["out"], out_chars.get(key, 0) // 4)
     for model, row in last.values():
-        m = models.setdefault(model, dict.fromkeys(KEYS, 0))
-        for k in KEYS:
+        prompt = row["in"] + row["cacheRead"] + row["cacheWrite"]
+        row["cost"] = price(model, row, prompt) or 0.0  # per call, so long-prompt price tiers apply correctly
+        m = models.setdefault(model, dict.fromkeys(KEYS + EXTRA, 0))
+        for k in KEYS + EXTRA:
             t[k] += row[k]
             m[k] += row[k]
     return t, models, access, calls
 
 
 def add(into, t, models, by_model, runs=1):
-    for k in KEYS:
+    for k in KEYS + EXTRA:
         into[k] = into.get(k, 0) + t[k]
     into["runs"] = into.get("runs", 0) + runs
     per = into.setdefault("models", {})
     for model, mt in models.items():
-        per[model] = per.get(model, 0) + sum(mt.values())
-        g = by_model.setdefault(model, dict.fromkeys(KEYS, 0))
-        for k in KEYS:
+        per[model] = per.get(model, 0) + sum(mt[k] for k in KEYS)
+        g = by_model.setdefault(model, dict.fromkeys(KEYS + EXTRA, 0))
+        for k in KEYS + EXTRA:
             g[k] += mt[k]
 
 
@@ -301,7 +308,7 @@ def main():
     if not hits:
         sys.exit(f"No transcript found for session {sid}")
     main_path = hits[0]
-    by_agent, by_card, by_model, access, calls, agent_member = {}, {}, {}, {}, {}, {}
+    by_agent, by_card, by_model, access, calls, agent_member, by_card_cost = {}, {}, {}, {}, {}, {}, {}
 
     t, models, acc, cl = scan(main_path, main=True)
     add(by_agent.setdefault("pm", {}), t, models, by_model)
@@ -324,7 +331,8 @@ def main():
         calls.setdefault(member, []).extend(cl)
         c = CARD.search(desc)
         if c:
-            by_card[c.group(1)] = by_card.get(c.group(1), 0) + sum(t.values())
+            by_card[c.group(1)] = by_card.get(c.group(1), 0) + sum(t[k] for k in KEYS)
+            by_card_cost[c.group(1)] = by_card_cost.get(c.group(1), 0) + t["cost"]
 
     access_out = {}
     for member, recs in access.items():
@@ -356,6 +364,9 @@ def main():
         "byAgent": by_agent,
         "byCard": by_card,
         "byModel": by_model,
+        "byCardCost": {k: round(v, 4) for k, v in by_card_cost.items()},
+        "cost": round(sum(a.get("cost", 0) for a in by_agent.values()), 4),
+        "unpriced": sorted(m for m in by_model if price(m, {}) is None),
         "access": access_out,
         "guard": guard[-100:],
     }, separators=(",", ":")))

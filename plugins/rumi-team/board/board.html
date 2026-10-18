@@ -233,6 +233,29 @@ svg.flow { display: block; margin: 0 auto; max-width: none; }
 .guard-list .why { grid-column: 3; color: var(--muted); overflow-wrap: anywhere; }
 .stackline { margin: 0; font-size: 14px; }
 
+/* Cost estimate and spend */
+.estimate { display: grid; gap: 10px; padding: 14px 16px; border-radius: 8px; background: var(--sunk); }
+.est-top { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 14px; }
+.est-big { font: 600 28px/1 var(--f-mono); font-variant-numeric: tabular-nums; }
+.est-range { font: 500 14px var(--f-mono); color: var(--ink); }
+.est-note { flex-basis: 100%; font-size: 13px; color: var(--muted); }
+.estimate details > summary { cursor: pointer; font-size: 13px; color: var(--muted); }
+.est-table { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 8px; font-variant-numeric: tabular-nums; }
+.est-table th { text-align: left; font: 500 11px var(--f-body); letter-spacing: .06em; text-transform: uppercase; color: var(--muted); padding: 0 10px 6px 0; }
+.est-table td { padding: 6px 10px 6px 0; border-top: 1px solid var(--line); vertical-align: top; }
+.est-table .r { text-align: right; font-family: var(--f-mono); white-space: nowrap; }
+.est-table .muted { color: var(--muted); }
+.est-notes { margin: 8px 0 0; padding-left: 18px; font-size: 12.5px; color: var(--muted); display: grid; gap: 3px; }
+.spend { display: grid; gap: 8px; padding-bottom: 12px; border-bottom: 1px solid var(--line); }
+.spend-top { display: flex; flex-wrap: wrap; gap: 6px 16px; align-items: baseline; }
+.spend-top .big { font: 600 30px/1 var(--f-mono); font-variant-numeric: tabular-nums; }
+.burn .models { margin-top: 10px; }
+.spendbar { position: relative; height: 12px; border-radius: 3px; background: var(--sunk); }
+.spendbar i { display: block; height: 100%; border-radius: 3px; background: var(--ok); }
+.spendbar i.near { background: var(--warn); } .spendbar i.over { background: var(--bad); }
+.spendbar .mark { position: absolute; top: -4px; bottom: -4px; width: 2px; background: var(--ink); transform: translateX(-1px); }
+.spendbar .mark.cap { background: var(--bad); }
+
 /* Token burn */
 .burn { display: grid; gap: 14px; }
 .burn-top { display: flex; flex-wrap: wrap; gap: 8px 28px; align-items: baseline; }
@@ -501,6 +524,7 @@ function briefHTML(m) {
         ${(b.plan || []).length ? `<details${b.status === "awaiting" ? " open" : ""}><summary>Plan (${b.plan.length} requirements)</summary><ul>${b.plan.map((x) => `<li>${esc(x)}</li>`).join("")}</ul></details>` : ""}
       </div>
     </div>
+    ${b.estimate ? estimateHTML(b.estimate, b.status === "awaiting") : ""}
     ${(b.challenges || []).length ? `<div class="challenges"><details${b.status === "awaiting" ? " open" : ""}>
       <summary><span class="label" style="color:var(--ch)">Challenged by ${esc(Object.values(m.agents).find((a) => a.role === "analyst")?.name || "Al-Ghazali")}, business analyst</span>
         · ${b.challenges.length} finding${b.challenges.length === 1 ? "" : "s"}${["high", "medium", "low"].map((sv) => { const n = b.challenges.filter((c) => c.severity === sv).length; return n ? ` · ${n} ${sv}` : ""; }).join("")}</summary>
@@ -520,6 +544,23 @@ function briefHTML(m) {
       <p style="margin:0;color:var(--muted);font-size:13px">Nothing happening after a few minutes? Rumi's Claude Code session may have been closed. Open it again and type <code>continue</code>.</p></div>` : ""}
     ${b.status === "changes" ? `<div class="signoff"><p class="gate">You asked for: “${esc(b.feedback)}”. Rumi is revising the brief. The new version will appear here for sign-off.</p></div>` : ""}
   </section>`;
+}
+function estimateHTML(e, open) {
+  const t = e.total || {}, row = (label, p, extra) => p ? `<tr><td>${label}</td><td>${extra || ""}</td><td class="r">${fmtTok(p.tokens[1])}</td><td class="r">${usd(p.cost[1])}</td><td class="r muted">${usdRange(p.cost)}</td></tr>` : "";
+  return `<div class="estimate">
+    <div class="est-top"><span class="label">Estimated cost</span>
+      <span class="est-big">${usd(t.cost?.[1])}</span><span class="est-range">likely ${usdRange(t.cost)} · about ${fmtTok(t.tokens?.[1] || 0)} tokens</span>
+      <span class="est-note">API-equivalent at prices checked ${esc(e.ratesChecked || "")}. Rumi pauses to ask you if spending passes ${usd((t.cost?.[1] || 0) * (e.overrunAt || 1.5))}.</span></div>
+    <details${open ? " open" : ""}><summary>Breakdown and assumptions</summary>
+      <div style="overflow-x:auto"><table class="est-table"><thead><tr><th>Work</th><th>Size · models</th><th class="r">Tokens</th><th class="r">Expected</th><th class="r">Range</th></tr></thead><tbody>
+        ${(e.cards || []).map((c) => row(`<span class="mono">${esc(c.id)}</span> ${esc(c.title || "")}`, c, `${esc(c.size)} · ${esc(modelName(c.devModel))} build, ${esc(modelName(c.qaModel))} QA`)).join("")}
+        ${row("Business analyst review", e.analyst, esc(modelName(e.analyst?.model)))}
+        ${row("Final regression check", e.regression, esc(modelName(e.regression?.model)))}
+        ${row("Rumi's coordination", e.pm, esc(modelName(e.pm?.model)))}
+      </tbody></table></div>
+      <ul class="est-notes">${(e.assumptions || []).map((a) => `<li>${esc(a)}</li>`).join("")}<li>Based on: ${esc(e.basis || "")}.</li>
+        ${(e.unpricedModels || []).length ? `<li>No price on file for ${esc(e.unpricedModels.join(", "))}, so they're left out of the total.</li>` : ""}</ul>
+    </details></div>`;
 }
 async function briefWrite(id, patch, summary) {
   if (S.busy[id]) return;
@@ -546,24 +587,30 @@ function modelName(id) {
   return m ? m[1][0].toUpperCase() + m[1].slice(1) + " " + m[2].split("-").join(".") : String(id || "Unknown model");
 }
 const topModel = (models) => Object.entries(models || {}).sort((a, b) => b[1] - a[1]).map(([k]) => k);
+const usd = (n) => n == null ? "—" : n >= 100 ? "$" + Math.round(n) : n >= 10 ? "$" + n.toFixed(1) : "$" + n.toFixed(2);
+const usdRange = (r) => r ? `${usd(r[0])}–${usd(r[2])}` : "";
+const currentEstimate = () => currentBrief()?.estimate || null;
 const tokTotal = (t) => (t.in || 0) + (t.out || 0) + (t.cacheRead || 0) + (t.cacheWrite || 0);
 function burn(m) {
   const latest = {};
   for (const e of m.asc) if (e.usage && e.usage.session) latest[e.usage.session] = e.usage;
-  const byAgent = {}, byCard = {}, byModel = {}, access = {}, guard = [], all = { in: 0, out: 0, cacheRead: 0, cacheWrite: 0 };
+  let cost = 0, priced = false;
+  const byAgent = {}, byCard = {}, byCardCost = {}, byModel = {}, access = {}, guard = [], all = { in: 0, out: 0, cacheRead: 0, cacheWrite: 0 };
   for (const u of Object.values(latest)) {
     for (const [id, t] of Object.entries(u.byAgent || {})) {
-      const a = (byAgent[id] ||= { in: 0, out: 0, cacheRead: 0, cacheWrite: 0, runs: 0 });
-      for (const k of ["in", "out", "cacheRead", "cacheWrite", "runs"]) a[k] += t[k] || 0;
+      const a = (byAgent[id] ||= { in: 0, out: 0, cacheRead: 0, cacheWrite: 0, runs: 0, cost: 0 });
+      for (const k of ["in", "out", "cacheRead", "cacheWrite", "runs", "cost"]) a[k] += t[k] || 0;
       for (const k of ["in", "out", "cacheRead", "cacheWrite"]) all[k] += t[k] || 0;
       a.models ||= {};
       for (const [mod, n] of Object.entries(t.models || {})) a.models[mod] = (a.models[mod] || 0) + n;
     }
     for (const [mod, t] of Object.entries(u.byModel || {})) {
-      const g = (byModel[mod] ||= { in: 0, out: 0, cacheRead: 0, cacheWrite: 0 });
-      for (const k of ["in", "out", "cacheRead", "cacheWrite"]) g[k] += t[k] || 0;
+      const g = (byModel[mod] ||= { in: 0, out: 0, cacheRead: 0, cacheWrite: 0, cost: 0 });
+      for (const k of ["in", "out", "cacheRead", "cacheWrite", "cost"]) g[k] += t[k] || 0;
     }
     for (const [c, n] of Object.entries(u.byCard || {})) byCard[c] = (byCard[c] || 0) + n;
+    for (const [c, n] of Object.entries(u.byCardCost || {})) byCardCost[c] = (byCardCost[c] || 0) + n;
+    cost += u.cost || 0; priced ||= u.cost != null;
     guard.push(...(u.guard || []));
     for (const [id, rows] of Object.entries(u.access || {})) {
       const into = (access[id] ||= {});
@@ -576,7 +623,7 @@ function burn(m) {
     }
   }
   guard.sort((a, b) => String(b.ts).localeCompare(String(a.ts)));
-  return { byAgent, byCard, byModel, all, guard, access: Object.fromEntries(Object.entries(access).map(([id, o]) => [id, Object.values(o)])), sessions: Object.keys(latest).length, total: tokTotal(all) };
+  return { byAgent, byCard, byCardCost, cost, priced, byModel, all, guard, access: Object.fromEntries(Object.entries(access).map(([id, o]) => [id, Object.values(o)])), sessions: Object.keys(latest).length, total: tokTotal(all) };
 }
 function burnHTML(m) {
   const b = S.burn;
@@ -587,6 +634,12 @@ function burnHTML(m) {
   const seg = (k, cls) => `<i class="${cls}" style="width:${(b.all[k] / Math.max(1, b.total)) * 100}%" title="${fmtTok(b.all[k])}"></i>`;
   return `<section class="panel burn" aria-labelledby="h-burn">
     <div class="section-head"><h2 id="h-burn">Token burn</h2><span class="label">${b.sessions} session${b.sessions > 1 ? "s" : ""} · from Claude Code transcripts</span></div>
+    ${b.priced ? (() => { const est = currentEstimate(), exp = est?.total?.cost?.[1], cap = exp ? exp * (est.overrunAt || 1.5) : null, scale = Math.max(b.cost, cap || 0, 0.01);
+      return `<div class="spend"><div class="spend-top"><span class="big">${usd(b.cost)}</span><span class="label">API-equivalent spend</span>
+        ${exp ? `<span class="mono" style="color:${b.cost >= cap ? "var(--bad)" : b.cost > exp ? "var(--warn)" : "var(--muted)"}">${Math.round((b.cost / exp) * 100)}% of the ${usd(exp)} estimate (likely ${usdRange(est.total.cost)})</span>` : `<span class="mono" style="color:var(--muted)">no estimate yet</span>`}</div>
+        ${exp ? `<div class="spendbar" role="img" aria-label="Spend against estimate"><i style="width:${Math.min(100, (b.cost / scale) * 100)}%" class="${b.cost >= cap ? "over" : b.cost > exp ? "near" : ""}"></i>
+          <span class="mark" style="left:${(exp / scale) * 100}%" title="Estimate ${usd(exp)}"></span><span class="mark cap" style="left:${(cap / scale) * 100}%" title="Pause point ${usd(cap)}"></span></div>
+          <div class="keys"><span>Estimate ${usd(exp)}</span><span>Rumi pauses to ask you at ${usd(cap)} (150%)</span></div>` : ""}</div>`; })() : ""}
     <div class="burn-top"><span class="big">${fmtTok(b.total)}</span><span class="label">tokens processed</span>
       <span class="mono" style="color:var(--muted)">${fmtTok(b.all.out)} output · ${fmtTok(b.all.in + b.all.cacheWrite)} new input · ${fmtTok(b.all.cacheRead)} cache reads</span></div>
     <div class="stack" role="img" aria-label="Token mix">${seg("cacheRead", "t-read")}${seg("cacheWrite", "t-write")}${seg("in", "t-in")}${seg("out", "t-out")}</div>
@@ -596,14 +649,14 @@ function burnHTML(m) {
       const mods = topModel(t.models);
       return `<div class="member"><span class="who">${id === "other" ? `<span class="chip c-user">Other agents</span>` : agentChip(m, id)}${mods.map((x) => `<span class="model" title="${esc(x)}">${esc(modelName(x))}</span>`).join("")}</span>
         <div class="track"><i class="f-${role}" style="width:${(total / max) * 100}%"></i></div>
-        <span class="num"><b>${fmtTok(total)}</b> · ${fmtTok(t.out)} out · ${t.runs} run${t.runs === 1 ? "" : "s"}</span></div>`;
+        <span class="num"><b>${fmtTok(total)}</b>${b.priced ? ` · ${usd(t.cost || 0)}` : ""} · ${t.runs} run${t.runs === 1 ? "" : "s"}</span></div>`;
     }).join("")}</div>
     ${Object.keys(b.byModel).length ? `<div style="overflow-x:auto"><table class="models">
-      <thead><tr><th>Model</th><th>Total</th><th>Output</th><th>New input</th><th>Cache reads</th><th>Used by</th></tr></thead>
+      <thead><tr><th>Model</th><th>Total</th><th>Cost</th><th>Output</th><th>New input</th><th>Cache reads</th><th>Used by</th></tr></thead>
       <tbody>${Object.entries(b.byModel).map(([mod, t]) => ({ mod, t, total: tokTotal(t) })).sort((x, y) => y.total - x.total).map(({ mod, t, total }) => {
         const users = Object.entries(b.byAgent).filter(([, a]) => a.models && a.models[mod]).map(([id]) => id === "other" ? "Other" : m.agents[id]?.name || id);
         return `<tr><td title="${esc(mod)}">${esc(modelName(mod))}</td><td>${fmtTok(total)}<span class="share" aria-hidden="true"><i style="width:${(total / Math.max(1, b.total)) * 100}%"></i></span></td>
-          <td>${fmtTok(t.out)}</td><td>${fmtTok(t.in + t.cacheWrite)}</td><td>${fmtTok(t.cacheRead)}</td><td style="font-family:var(--f-body);white-space:normal">${esc(users.join(", "))}</td></tr>`;
+          <td>${b.priced ? usd(t.cost || 0) : "—"}</td><td>${fmtTok(t.out)}</td><td>${fmtTok(t.in + t.cacheWrite)}</td><td>${fmtTok(t.cacheRead)}</td><td style="font-family:var(--f-body);white-space:normal">${esc(users.join(", "))}</td></tr>`;
       }).join("")}</tbody></table></div>` : ""}
   </section>`;
 }
@@ -861,7 +914,8 @@ function cardHTML(c) {
   const m = S.model, total = (c.acceptance || []).length, met = (c.criteria || []).filter((x) => x === true).length;
   const ownerWorking = c.owner && m.agents[c.owner]?.status === "working" && m.agents[c.owner]?.cardId === c.id;
   return `<button type="button" class="card${ownerWorking ? " working" : ""}" data-card="${esc(c.id)}">
-    <div class="row"><span class="mono prio">${esc(c.id)}</span>${S.burn.byCard[c.id] ? `<span class="tok" title="Tokens used on this requirement">${fmtTok(S.burn.byCard[c.id])} tok</span>` : ""}${c.priority != null ? `<span class="prio">P${esc(c.priority)}</span>` : ""}</div>
+    <div class="row"><span class="mono prio">${esc(c.id)}</span>${(() => { const e = currentEstimate()?.cards?.find((x) => x.id === c.id), sp = S.burn.byCardCost?.[c.id];
+      return e || sp ? `<span class="tok" title="${e ? `Estimated ${usdRange(e.cost)} (size ${esc(e.size)})` : ""}${sp ? ` · spent ${usd(sp)} on ${fmtTok(S.burn.byCard[c.id] || 0)} tokens` : ""}">${sp ? usd(sp) : ""}${e ? `${sp ? " / " : "est "}${usd(e.cost[1])}` : ""}</span>` : (S.burn.byCard[c.id] ? `<span class="tok">${fmtTok(S.burn.byCard[c.id])} tok</span>` : ""); })()}${c.priority != null ? `<span class="prio">P${esc(c.priority)}</span>` : ""}</div>
     <div class="t">${esc(c.title)}</div>
     ${ownerWorking ? `<div class="live-line"><span class="pulse-dot" aria-hidden="true"></span><span>${esc(m.agents[c.owner].activity || "Working on it")}</span><span class="since">${esc(ago(m.agents[c.owner].updatedAt || c.updatedAt))}</span></div>` : ""}
     <div class="meta">${S.attention.some((a) => a.status === "open" && a.cardId === c.id) ? `<span class="flag">Needs you</span>` : ""}${agentChip(m, c.owner)}${c.model && c.column !== "done" ? `<span class="model" title="Model chosen for this card">${esc(modelName(c.model))}</span>` : ""}${c.attempts > 1 ? `<span class="rework">rework ×${c.attempts - 1}</span>` : ""}</div>
