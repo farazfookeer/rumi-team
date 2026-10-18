@@ -918,7 +918,7 @@ function cardHTML(c) {
       return e || sp ? `<span class="tok" title="${e ? `Estimated ${usdRange(e.cost)} (size ${esc(e.size)})` : ""}${sp ? ` · spent ${usd(sp)} on ${fmtTok(S.burn.byCard[c.id] || 0)} tokens` : ""}">${sp ? usd(sp) : ""}${e ? `${sp ? " / " : "est "}${usd(e.cost[1])}` : ""}</span>` : (S.burn.byCard[c.id] ? `<span class="tok">${fmtTok(S.burn.byCard[c.id])} tok</span>` : ""); })()}${c.priority != null ? `<span class="prio">P${esc(c.priority)}</span>` : ""}</div>
     <div class="t">${esc(c.title)}</div>
     ${ownerWorking ? `<div class="live-line"><span class="pulse-dot" aria-hidden="true"></span><span>${esc(m.agents[c.owner].activity || "Working on it")}</span><span class="since">${esc(ago(m.agents[c.owner].updatedAt || c.updatedAt))}</span></div>` : ""}
-    <div class="meta">${S.attention.some((a) => a.status === "open" && a.cardId === c.id) ? `<span class="flag">Needs you</span>` : ""}${agentChip(m, c.owner)}${c.model && c.column !== "done" ? `<span class="model" title="Model chosen for this card">${esc(modelName(c.model))}</span>` : ""}${c.attempts > 1 ? `<span class="rework">rework ×${c.attempts - 1}</span>` : ""}</div>
+    <div class="meta">${S.attention.some((a) => a.status === "open" && a.cardId === c.id) ? `<span class="flag">Needs you</span>` : ""}${agentChip(m, c.owner)}${c.model && c.column !== "done" ? `<span class="model" title="Model chosen for this card">${esc(modelName(c.model))}</span>` : ""}${c.attempts > 1 ? `<span class="rework" title="${c.rework === "resumed" ? "Sent back to the developer who built it, who keeps its memory of the code" : c.rework === "fresh" ? "Given to a fresh developer on a stronger model" : ""}">rework ×${c.attempts - 1}${c.rework ? ` · ${c.rework === "resumed" ? "same developer" : "fresh developer"}` : ""}</span>` : ""}</div>
     ${total ? `<div class="meta"><div class="bar"><i style="width:${(met / total) * 100}%"></i></div><span class="mono">${met}/${total}</span></div>` : ""}
   </button>`;
 }
@@ -1002,7 +1002,7 @@ function logHTML(m, onlyCard) {
         ${e.cardId && !onlyCard ? `<button type="button" class="cardlink" data-card="${esc(e.cardId)}">${esc(e.cardId)}</button>` : ""}</div>
       <p class="sum">${esc(e.summary)}</p>
       ${e.rationale ? `<p class="why">${esc(e.rationale)}</p>` : ""}
-      ${e.model ? `<p class="sum" style="font-size:12.5px;color:var(--muted)"><span class="model">${esc(modelName(e.model))}</span> ${esc(e.modelReason || "")}</p>` : ""}
+      ${e.model ? `<p class="sum" style="font-size:12.5px;color:var(--muted)">${e.rework ? `<span class="kind" style="margin-right:6px">${e.rework === "resumed" ? "rework · resumed" : "rework · fresh"}</span>` : ""}<span class="model">${esc(modelName(e.model))}</span> ${esc(e.modelReason || "")}</p>` : ""}
     </div></li>`).join("");
 }
 

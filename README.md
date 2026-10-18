@@ -74,7 +74,7 @@ You don't need to know how to code.
 2. **Al-Ghazali questions the plan** for gaps. Rumi fixes what it can, and asks you about anything only you can decide.
 3. **You sign off the plan** on the board (or by replying in Claude Code). **Nothing gets built until you do.** If something's wrong, press **Request changes** and say what you want.
 4. **For a new project, the team sets up the workspace first:** sensible folders, a working run and test setup, and a `CLAUDE.md` file describing your project, so every future Claude session understands it.
-5. **The developers build it** and **the testers check it.** Work that fails a test goes back to be fixed.
+5. **The developers build it** and **the testers check it.** Work that fails a test goes back to be fixed. The first fix goes to the developer who built it, who remembers the code. If it fails again, a fresh developer on a stronger model takes over.
 6. **If the team needs you,** a question appears at the top of the board under **Needs you**, and in Claude Code. Answer in either place.
 7. **When it's done,** Rumi gives you a summary of what was built, what was checked, and anything left over.
 

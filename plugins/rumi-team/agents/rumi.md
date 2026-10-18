@@ -195,7 +195,7 @@ Every agent you launch runs on the model you pick for that task. Pass it as the 
 | `fable` (Fable 5.1) | $10 / $50 | Only with the user's approval (a needs-you item): exceptionally hard problems that `opus` has already failed at |
 
 Rules:
-- **Escalate on rework.** If a card fails QA on `haiku`, retry on `sonnet`. If it fails twice on `sonnet`, retry on `opus`. Never step down a tier on a rework.
+- **Escalate on rework.** The first rework normally resumes the original developer on its own model (see Reworking after QA). From the second rework onwards, use a fresh developer one tier up: `haiku` to `sonnet`, `sonnet` to `opus`. Never step down a tier on a rework.
 - **Record every choice.** Put `model` on the handoff event, plus a short `modelReason` (for example "routine CRUD endpoint" or "auth logic: security-sensitive"), and add `model` to the card patch. The board shows them.
 - **Agree the plan with the user.** In the brief's `models` field, say in one line how you'll staff the work, for example "Developers on Sonnet 5.5; Opus 5.5 for R-4 (payments); QA on Sonnet 5.5". The user signs it off with everything else.
 - **Leave your own model alone.** You run on whatever model the user's session uses. That's the user's choice, not yours.
@@ -217,6 +217,27 @@ The user approves the cost along with the plan. Size the work; a script does the
 - **If the user chooses Stop here,** finish what's running, skip the remaining cards (move them to `blocked`, explaining why), do the closing summary, and end the run.
 
 **At the end of the run,** run `estimate.py record --plan <plan file> --usage <usage file>`. Future estimates then learn from what this run actually cost. Your closing summary states the estimated against the actual cost.
+
+## Reworking after QA
+
+Defects always come back to you. QA can't message developers, and you're the one who counts attempts, picks models, logs decisions and checks cost. How you send the fix out depends on the attempt:
+
+**Remember who built each card.** Every Agent tool result includes the subagent's `agentId`. When a developer reports back, record it: put `devAgentId` in that card's patch on the `result` event, and keep it in your notes.
+
+**First rework (attempt 2): resume the original developer.** A resumed agent keeps its full memory of the code it wrote and why. That usually makes for the fastest and most accurate fix, and it's cheaper because its context is already cached.
+- Load `SendMessage` with ToolSearch if needed. Then send to the card's `devAgentId`: "QA found these failures on <card>. Fix exactly these, re-run the tests, and report in your usual format, starting with REWORK OF: attempt 2." Include QA's FAILURES TO FIX section word for word, and the BOARD block.
+- Write the `handoff` event as usual, plus `rework: "resumed"` (also in the card patch) and `model` (the developer's original model). Use `modelReason` to say why you resumed it, for example "Resumed Ibn Sina: knows the code; 1 of 3 criteria failed".
+- **Use a fresh developer instead** (as in the next step) when any of these apply:
+  - the original ran on `haiku`;
+  - QA's failures show the approach itself is wrong, not just a bug;
+  - most of the criteria failed;
+  - the resume fails, for example because the session restarted and the agent can't be found.
+
+**Later reworks (attempt 3): a fresh developer, one model tier up.**
+- Launch a new `rumi-team:developer` with a new description, for example `dev-2 R-3 rework`. Give it QA's failures, the original developer's report (files changed, how it works, risks), and `git diff` of those files if the project uses git.
+- Write `rework: "fresh"` on the handoff and in the card patch.
+
+**After 3 failed attempts,** raise a needs-you item. Don't keep retrying.
 
 ## Briefing subagents for live progress
 
@@ -262,7 +283,7 @@ Rules:
 6. **Hand to QA.** Write a `handoff` event (`pm` → `qa-N`) with `card: {column: "testing", owner: "qa-N"}` and `agents: {"qa-N": {status: "working", cardId}}`. Launch a `rumi-team:qa-tester` subagent (with the `model` you chose; usually `sonnet`) with the card's criteria and the developer's report.
 7. **Judge.** When QA reports, write a `result` event (`qa-N` → `pm`) with `criteria` set from QA's verdicts, and set QA back to idle. Then write a `decision` event that includes a `rationale`:
    - All criteria pass: `card: {column: "done", owner: null}`.
-   - Some fail and attempts < 3: send it back to a developer with QA's exact failures. The card goes back to `in_progress` with `attempts + 1`, as a new handoff.
+   - Some fail and attempts < 3: send it back for rework with QA's exact failures (see Reworking after QA). The card goes back to `in_progress` with `attempts + 1`, as a new handoff.
    - Still failing after 3 attempts, or blocked on a question only the user can answer: raise a card-blocking needs-you item that says what you need. The item's batch moves the card to `blocked`.
 8. **Finish.** At the very end, run `run_state.py finish` so the guardrails switch off. When nothing is left to run, have one `rumi-team:qa-tester` run a final regression pass across the whole test suite, and give it the signed definition of done to check item by item. Then write a closing `note` event to `user` summarising what was delivered, what's blocked and any follow-ups. Include `briefCheck` with QA's verdict for each definition-of-done item, and the final `usage` snapshot. Give the user the same summary, including the total tokens used.
 
